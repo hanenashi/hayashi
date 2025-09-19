@@ -16,9 +16,9 @@ jobs:
         include:
           - os: windows-latest
             py: '3.11'
-          - os: macos-14     # Apple Silicon runner
+          - os: macos-14     # Apple Silicon
             py: '3.11'
-          - os: macos-13     # Intel runner
+          - os: macos-13     # Intel
             py: '3.11'
 
     steps:
@@ -36,23 +36,19 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build with PyInstaller (spec)
+      # ---------- macOS build via CLI (auto .app) ----------
+      - name: Build macOS app
+        if: startsWith(matrix.os, 'macos')
         run: |
-          pyinstaller hayashi.spec
+          pyinstaller -y --windowed --noconsole --name Hayashi hayashi.py
+          test -d "dist/Hayashi.app" || (echo "Hayashi.app not found" && exit 1)
 
-      # macOS: zip the .app so it keeps its bundle structure as an artifact
       - name: Package macOS .app (zip)
         if: startsWith(matrix.os, 'macos')
         run: |
           cd dist
+          # zip preserving resource forks & bundle attrs
           ditto -c -k --sequesterRsrc --keepParent "Hayashi.app" "Hayashi-${{ matrix.os }}.zip"
-
-      # Windows: zip the onedir folder
-      - name: Package Windows folder (zip)
-        if: startsWith(matrix.os, 'windows')
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "dist/Hayashi/*" -DestinationPath "dist/Hayashi-windows.zip"
 
       - name: Upload artifact (macOS)
         if: startsWith(matrix.os, 'macos')
@@ -61,6 +57,19 @@ jobs:
           name: Hayashi-${{ matrix.os }}
           path: dist/Hayashi-${{ matrix.os }}.zip
           if-no-files-found: error
+
+      # ---------- Windows build via spec (onedir) ----------
+      - name: Build Windows (spec)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          pyinstaller hayashi.spec
+
+      - name: Package Windows (zip)
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path "dist/Hayashi")) { throw "dist/Hayashi not found" }
+          Compress-Archive -Path "dist/Hayashi/*" -DestinationPath "dist/Hayashi-windows.zip"
 
       - name: Upload artifact (Windows)
         if: startsWith(matrix.os, 'windows')
