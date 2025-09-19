@@ -1,0 +1,71 @@
+name: build-hayashi
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            py: '3.11'
+          - os: macos-14     # Apple Silicon runner
+            py: '3.11'
+          - os: macos-13     # Intel runner
+            py: '3.11'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller (spec)
+        run: |
+          pyinstaller hayashi.spec
+
+      # macOS: zip the .app so it keeps its bundle structure as an artifact
+      - name: Package macOS .app (zip)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "Hayashi.app" "Hayashi-${{ matrix.os }}.zip"
+
+      # Windows: zip the onedir folder
+      - name: Package Windows folder (zip)
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/Hayashi/*" -DestinationPath "dist/Hayashi-windows.zip"
+
+      - name: Upload artifact (macOS)
+        if: startsWith(matrix.os, 'macos')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hayashi-${{ matrix.os }}
+          path: dist/Hayashi-${{ matrix.os }}.zip
+          if-no-files-found: error
+
+      - name: Upload artifact (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hayashi-windows
+          path: dist/Hayashi-windows.zip
+          if-no-files-found: error
