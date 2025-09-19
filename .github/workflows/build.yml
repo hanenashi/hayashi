@@ -1,10 +1,7 @@
 name: build-hayashi
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-  workflow_dispatch:
+  workflow_dispatch:   # only runs when triggered manually in Actions tab
 
 jobs:
   build:
@@ -30,7 +27,7 @@ jobs:
         with:
           python-version: ${{ matrix.py }}
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -47,7 +44,6 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: |
           cd dist
-          # zip preserving resource forks & bundle attrs
           ditto -c -k --sequesterRsrc --keepParent "Hayashi.app" "Hayashi-${{ matrix.os }}.zip"
 
       - name: Upload artifact (macOS)
@@ -57,6 +53,7 @@ jobs:
           name: Hayashi-${{ matrix.os }}
           path: dist/Hayashi-${{ matrix.os }}.zip
           if-no-files-found: error
+          retention-days: 7
 
       # ---------- Windows build via spec (onedir) ----------
       - name: Build Windows (spec)
@@ -78,3 +75,4 @@ jobs:
           name: Hayashi-windows
           path: dist/Hayashi-windows.zip
           if-no-files-found: error
+          retention-days: 14
